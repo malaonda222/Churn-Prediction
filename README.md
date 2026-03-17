@@ -1,178 +1,250 @@
-# Previsione del Churn dei Clienti Telco
+# Telco Customer Churn Prediction
 
-## Panoramica del Progetto
-Questo progetto si concentra sulla previsione del churn dei clienti nel settore delle telecomunicazioni utilizzando tecniche di machine learning.
+> Progetto di Machine Learning per la previsione del rischio di abbandono clienti nel settore delle telecomunicazioni, sviluppato su **Dataiku DSS**.
+> Questo progetto si concentra sulla previsione del churn dei clienti nel settore delle telecomunicazioni utilizzando tecniche di machine learning.
+> Il churn dei clienti si verifica quando un cliente interrompe l'utilizzo dei servizi di un'azienda. L'obiettivo è **identificare in anticipo i clienti ad alto rischio**, consentendo interventi mirati di retention.
 
-Il churn dei clienti si verifica quando un cliente interrompe l'utilizzo dei servizi di un'azienda. L'obiettivo è **identificare in anticipo i clienti ad alto rischio**, consentendo interventi mirati di retention.
+--- 
 
 ## Presentazione del Progetto
 Una presentazione completa del progetto, creata con Gamma, è disponibile al seguente link:
 
 [Visualizza Presentazione](https://gamma.app/docs/Analisi-del-Churn-in-unazienda-Telco-4y40srwy2oq6lfx?mode=doc)
+---
 
-### Contenuti della Presentazione:
-- Problema di business e obiettivi
-- Pipeline dati end-to-end
-- Scelta e valutazione del modello
-- Variabili chiave e driver del churn
-- Raccomandazioni strategiche
+## Panoramica del Progetto
 
-## Contesto di Business
-Le aziende di telecomunicazioni affrontano tassi elevati di churn a causa della forte concorrenza. Mantenere i clienti esistenti è molto più conveniente rispetto all'acquisizione di nuovi clienti.
+| Attributo | Dettaglio |
+|---|---|
+| **Settore** | Telecomunicazioni |
+| **Tipo di Problema** | Classificazione binaria |
+| **Target** | `Churn` (Yes / No) |
+| **Strumento** | Dataiku DSS |
+| **Algoritmi** | Random Forest, XGBoost, Logistic Regression |
 
-### Obiettivi di Business
-- Identificare i clienti a rischio di churn
-- Supportare campagne di retention mirate
-- Offrire promozioni e sconti personalizzati
+### Scenario Aziendale
+
+Una società di telecomunicazioni (Telco) sta affrontando un problema diffuso nel settore: la perdita di clienti (**churn**). L'obiettivo è costruire un modello predittivo in grado di identificare con anticipo quali clienti sono più propensi ad abbandonare il servizio, per consentire interventi mirati prima che sia troppo tardi.
+
+### Decisioni Supportate dal Modello
+
+- **Campagne di Retention** — Identificare i clienti a rischio per includerli in campagne di fidelizzazione personalizzate.
+- **Sconti e Offerte Mirate** — Proporre upgrade o sconti ai clienti con alta probabilità di abbandono.
 
 ### Valore per il Business
-- Riduzione del tasso di churn
-- Incremento del valore del cliente nel tempo
-- Maggiore stabilità dei ricavi
+
+Mantenere un cliente esistente è quasi sempre meno costoso che acquisirne uno nuovo. Una riduzione anche piccola del tasso di churn può avere un impatto significativo sui ricavi e sulla stabilità del business.
+
+---
 
 ## Dataset
-- Fonte: [Telco Customer Churn Dataset (Kaggle)](https://www.kaggle.com/datasets/blastchar/telco-customer-churn)
-- Record: 7043 clienti
-- Variabili: 21
 
-### Variabili Chiave
-| Categoria       | Esempi                                   | Descrizione                          |
-|-----------------|-----------------------------------------|--------------------------------------|
-| Demografiche    | gender, SeniorCitizen, Partner          | Informazioni sul cliente             |
-| Servizi         | PhoneService, InternetService, OnlineSecurity | Servizi sottoscritti          |
-| Account         | tenure, Contract, MonthlyCharges, TotalCharges | Informazioni su contratto e fatturato |
-| Target          | Churn                                   | Indica se il cliente ha abbandonato (Yes/No) |
+Il progetto utilizza il noto dataset **"Telco Customer Churn"** di IBM, ampiamente utilizzato per problemi di classificazione.
+
+- [Kaggle — Telco Customer Churn](https://www.kaggle.com/datasets/blastchar/telco-customer-churn)
+- **~7.000 righe**, **21 variabili**
+
+### Variabili Principali
+
+| Categoria | Variabili | Descrizione |
+|---|---|---|
+| Dati Demografici | `gender`, `SeniorCitizen`, `Partner` | Informazioni anagrafiche sul cliente |
+| Servizi Sottoscritti | `PhoneService`, `InternetService`, `OnlineSecurity` | Dettagli sui servizi attivi |
+| Dati Contabili | `tenure`, `Contract`, `MonthlyCharges`, `TotalCharges` | Anzianità, contratto e importi fatturati |
+| **Target** | **`Churn`** | Se il cliente ha abbandonato il servizio (`Yes` / `No`) |
+
+---
+
+## Pipeline e Flow
+
+Il Flow in Dataiku rappresenta l'intera pipeline end-to-end, dalla raccolta dei dati grezzi fino alle previsioni sui nuovi clienti.
+
+```
+telco_future_customers ──────────────────────────────────────────────────────────┐
+                                                                                  ▼
+Telco_Raw → [Prepare] → Telco_prepared → [Prepare] → Telco_features → [Predict Churn] → telco_predictions
+                                                              │
+                                                              └─────────────────────────→ Telco_test_scored
+```
+
+**Dataset prodotti nel Flow:**
+
+| Dataset | Descrizione |
+|---|---|
+| `Telco_Raw` | Dataset grezzo importato da Kaggle |
+| `Telco_prepared` | Dati puliti e con encoding delle variabili categoriche |
+| `Telco_features` | Dataset con feature engineering applicato |
+| `telco_train` / `telco_test` | Split 80/20 per training e valutazione |
+| `telco_future_customers` | Nuovi clienti da scorare |
+| `telco_predictions` | Output finale con probabilità di churn |
+
+---
 
 ## Preparazione dei Dati
 
-### Pulizia dei Dati
-- Conversione della colonna `TotalCharges` da stringa a numerica
-- Gestione dei valori mancanti (clienti con tenure = 0 → imputazione con 0)
+A partire dal dataset grezzo `Telco_Raw`, è stata creata una **Prepare Recipe** per generare `Telco_prepared`.
 
-### Codifica
-- Applicazione di One-Hot Encoding alle variabili categoriche
+### Sfide Affrontate
+
+**1. Gestione dei valori mancanti in `TotalCharges`**
+
+La colonna `TotalCharges`, sebbene numerica, era interpretata come stringa a causa di spazi vuoti per i clienti con `tenure = 0` (clienti nuovi, senza ancora addebiti). Il processo applicato:
+
+- Conversione degli spazi vuoti in veri `missing values`
+- Imputazione con `0` (nessun addebito per clienti nuovi)
+- Conversione della colonna in tipo numerico
+
+**2. Encoding delle Variabili Categoriche**
+
+Applicato **Dummy Encoding** (One-Hot Encoding) su tutte le colonne testuali (`Contract`, `InternetService`, `OnlineSecurity`, ecc.) per renderle interpretabili dagli algoritmi di ML.
+
+---
 
 ## Feature Engineering
-Per migliorare le performance del modello, sono state create nuove variabili:
 
-- **Gruppi di Tenure**
-  - 0–12 mesi
-  - 13–24 mesi
-  - 25–48 mesi
-  - superiore a 48 mesi
-- **Fasce di Costo Mensile**
-  - Basso
-  - Medio
-  - Alto
+A partire da `Telco_prepared`, è stato creato il dataset `Telco_features` con le seguenti nuove variabili:
 
-## Pipeline dei Dati (Dataiku Flow)
-Il progetto segue la seguente pipeline:
-telco_raw → telco_prepared → telco_features → modello → predizioni
+| Nuova Feature | Descrizione | Encoding |
+|---|---|---|
+| `tenure_group` | Fascia di anzianità del cliente: 0–12, 13–24, 25–48, >48 mesi | One-Hot Encoding |
+| `monthly_cost_bucket` | Fascia di spesa mensile: Bassa, Media, Alta | One-Hot Encoding |
 
+Queste feature aiutano il modello a generalizzare meglio rispetto ai valori continui originali, catturando pattern di comportamento per gruppi di clienti.
 
-- `telco_prepared`: dataset pulito  
-- `telco_features`: dataset arricchito con le feature ingegnerizzate  
-- Predizioni generate su:
-  - set di test (`telco_test_scored`)  
-  - nuovi clienti (`telco_predictions`)  
+---
 
 ## Modellazione
 
-### Approccio
-- Tipo di problema: Classificazione binaria  
-- Suddivisione Train/Test: 80/20  
-- Piattaforma: Dataiku AutoML  
+### Divisione del Dataset
 
-### Modelli presi in considerazione
-- Regressione Logistica  
-- Random Forest  
+Split **80% training / 20% test** applicato su `Telco_features` tramite Split Recipe.
 
-Modello con le migliori performance:
-- Random Forest  
+### Algoritmi Addestrati
 
-## Performance del Modello
+Tramite la funzionalità **AutoML Prediction** di Dataiku, con `Churn` come variabile target:
 
-### Metriche
-- Accuracy: 70%  
-- Precision: 46%  
-- Recall: 90%  
-- F1-score: 61%  
+- Logistic Regression
+- Random Forest *(modello selezionato)*
+- XGBoost *(performance comparabile)*
 
-### ROC Curve
-- Buona separazione tra le classi  
-- AUC elevata (0.854) → ottima capacità discriminante del modello  
+---
 
-## Ottimizzazione della Soglia (Business-Driven)
-La soglia di classificazione è stata impostata a 0.400 (anziché 0.5) per privilegiare la **recall** rispetto alla precision:
+## Risultati e Performance
 
-- Massimizzare l'identificazione dei churner  
-- Accettare un numero maggiore di falsi positivi  
+### Curva ROC
 
-**Ragione di business:** perdere un churner è più costoso che contattare un cliente che non avrebbe abbandonato.
+La curva ROC si discosta nettamente dalla diagonale casuale, confermando un'ottima capacità discriminativa del modello. L'AUC dimostra che il modello riesce a separare efficacemente i clienti che fanno churn da quelli che restano.
 
-## Analisi della Confusion Matrix
+### Matrice di Confusione (soglia = 0.40)
 
-|                | Predetto Yes | Predetto No |
-|----------------|--------------|-------------|
-| Effettivo Yes  | 330 (TP)     | 37 (FN)     |
-| Effettivo No   | 382 (FP)     | 645 (TN)    |
+La soglia di classificazione è stata abbassata a **0.40** (default 0.50) per privilegiare la **Recall** rispetto alla Precision: in un contesto di retention, è preferibile contattare qualche falso positivo piuttosto che perdere un vero churner.
 
-**Insight chiave:** bassi falsi negativi → forte rilevazione dei churner; falsi positivi maggiori → trade-off accettabile.
+|  | Predicted Yes | Predicted No | Totale |
+|---|---|---|---|
+| **Actually Yes** | 330 | 37 | 367 |
+| **Actually No** | 382 | 645 | 1027 |
+| **Totale** | 712 | 682 | 1394 |
 
-## Interpretazione del Modello
+### Metriche Principali
 
-### Importanza delle Variabili
-Le variabili più influenti:
-- Tipo di contratto  
-- Tenure  
-- Servizio Internet  
-- Online Security  
-- Total Charges  
+| Metrica | Valore |
+|---|---|
+| **Accuracy** | 70% |
+| **Precision** | 46% |
+| **Recall** | **90%** |
+| **F1-Score** | 61% |
 
-### Insight Chiave
-- Contratti Month-to-Month → rischio di churn più alto  
-- Tenure breve (0–12 mesi) → alta probabilità di churn  
-- Bollette elevate → correlazione positiva con il churn  
-- Utenti Fiber optic → maggiore probabilità di abbandono  
-- Assenza di Online Security → rischio aumentato  
-- Clienti con lunga tenure (>48 mesi) → più fedeli  
+> La Recall del **90%** è il dato più rilevante: il modello identifica correttamente 9 churner su 10, consentendo all'azienda di intervenire sulla grande maggioranza dei clienti a rischio.
 
-### Insight Comportamentali
-- La probabilità di churn diminuisce con l’aumentare della tenure  
-- Clienti con servizi base → maggiore rischio  
-- Clienti con pacchetti di servizi più completi → più fedeli  
+### Distribuzione delle Probabilità
 
-## Analisi Scenario (What-If)
-Esempio:
-- Cliente con contratto Month-to-Month → rischio alto  
-- Cambio contratto:
-  - One-year
-  - Two-year
-- Risultato: riduzione significativa della probabilità di churn  
+Il modello assegna probabilità basse ai clienti che non abbandonano e probabilità più alte a chi effettivamente fa churn. Esiste una zona intermedia (0.30–0.60) con maggiore incertezza, tipica dei problemi di churn reali, dove i clienti presentano caratteristiche ambigue.
 
-## Deploy e Predizioni
+---
 
-### Deploy del Modello
-- Modello migliore deployato in Dataiku Flow  
+## Interpretabilità del Modello
 
-### Scoring Nuovi Clienti
-- Dataset creato: `telco_future_customers`  
-- Applicazione del modello tramite scoring pipeline  
+### Feature Importance (Top 10)
 
-### Output
-- `prediction` → classificazione churn  
-- `proba_Yes` → probabilità di churn  
+| Feature | Importanza | Interpretazione |
+|---|---|---|
+| `Contract - Month-to-month` | **18%** | Contratto mensile = massimo rischio churn |
+| `Contract - Two years` | 12% | Contratto biennale = forte fattore protettivo |
+| `IS - Fiber optic` | 12% | Fibra ottica associata a maggiore insoddisfazione |
+| `OS - No` | 8% | Assenza di Online Security aumenta il rischio |
+| `TG - 0-12 mesi` | 7% | Clienti nuovi molto vulnerabili |
+| `TotalCharges` | 7% | Proxy della fedeltà (correlato a tenure >48 mesi) |
+| `IS - No` | 5% | Assenza di internet riduce il rischio |
+| `MonthlyCharges` | 5% | Bolletta alta associata a più churn |
 
-## Strumenti e Tecnologie
-- Dataiku DSS  
-- Machine Learning (Classificazione)  
-- AutoML  
+### Grafico SHAP — Feature Effects
 
-## Conclusioni
-- Tipo di contratto è il principale driver del churn  
-- Clienti all’inizio della tenure sono i più a rischio  
-- La scelta della soglia è fondamentale per allineare il modello al business  
-- L’interpretazione del modello supporta le decisioni strategiche  
+L'analisi SHAP conferma e approfondisce la feature importance:
+
+- **Contract Month-to-month** (valore alto) spinge fortemente verso il churn
+- **Contract Two years** (valore alto) riduce significativamente la probabilità di abbandono
+- **IS - Fiber optic** e **OS - No** aumentano il rischio di churn
+- **TotalCharges** alti (clienti fedeli da lungo tempo) abbassano il rischio
+- **Tenure 0–12 mesi** ha un forte impatto positivo sul rischio di abbandono
+
+### What-If Analysis — Impatto del Tipo di Contratto
+
+Simulando lo stesso cliente con tre diversi tipi di contratto, si osserva come il tipo di contratto sia la leva più potente per la retention:
+
+| Tipo di Contratto | Probabilità Churn | Previsione |
+|---|---|---|
+| Month-to-month | **44.20%** | Yes |
+| One year | 24.67% | No |
+| Two years | **13.41%** | No |
+
+> Convertire un cliente da mensile a biennale riduce la probabilità di churn di oltre **30 punti percentuali**.
+
+---
+
+## Previsioni su Nuovi Clienti
+
+Il modello è stato deployato nel Flow di Dataiku. Tramite la **Score Recipe**, è possibile applicare il modello a qualsiasi nuovo dataset di clienti. L'output `telco_predictions` contiene:
+
+- Le colonne originali del cliente
+- `proba_Yes` — probabilità di churn (0–1)
+- `prediction` — previsione finale (`Yes` / `No`)
+
+---
+
+## Insight di Business
+
+### Profilo Cliente ad Alto Rischio Churn 
+
+- Contratto **mensile** (Month-to-month)
+- Connessione **fibra ottica**
+- **Nessun servizio** di sicurezza online (Online Security = No)
+- Cliente da **0–12 mesi**
+
+### Profilo Cliente Fedele / Basso Rischio 
+
+- Contratto **biennale** (Two years)
+- **Nessun servizio internet** aggiuntivo
+- Cliente da **oltre 48 mesi**
+
+### Raccomandazioni Operative
+
+1. **Incentivare l'upgrade contrattuale** — Offrire vantaggi economici ai clienti mensili per passare a contratti annuali o biennali. La What-If Analysis dimostra che questa è la leva più impattante (-30pp di probabilità churn).
+2. **Onboarding mirato nei primi 12 mesi** — I clienti nuovi sono i più vulnerabili: investire in un'esperienza di onboarding di qualità e nel monitoraggio proattivo della soddisfazione.
+3. **Bundle servizi di sicurezza** — Includere Online Security nei pacchetti base per i clienti fibra, riducendo uno dei fattori di rischio più rilevanti.
+4. **Segmentazione per campagne retention** — Utilizzare il modello in produzione per generare score periodici e prioritizzare le azioni di retention sui clienti con `proba_Yes > 0.40`.
+
+---
+
+## Stack Tecnologico
+
+| Strumento | Utilizzo |
+|---|---|
+| **Dataiku DSS** | Orchestrazione pipeline ML end-to-end |
+| **AutoML** | Addestramento e confronto automatico dei modelli |
+| **SHAP** | Interpretabilità e spiegazione delle previsioni |
+| **Random Forest / XGBoost** | Algoritmi di classificazione |
+
+---
 
 ## Miglioramenti Futuri
 - Ottimizzazione iperparametri  
@@ -182,3 +254,8 @@ Esempio:
 
 ## Autore
 Lisa Bandinelli 
+
+
+
+
+
